@@ -26,7 +26,6 @@ background:linear-gradient(var(--line) 0 0) center/1px 100% no-repeat,linear-gra
 .cell span{background:var(--panel);padding:0 .08em;line-height:1.1}
 .rom{font-size:clamp(2.4rem,13vw,4rem);font-weight:900;letter-spacing:.04em;padding:.6rem 0}
 .opts.kana button{font-size:1.7rem;letter-spacing:.06em}
-.say{margin-top:.8rem;background:none;border:1.5px solid var(--soft);border-radius:2rem;padding:.3rem .9rem;cursor:pointer}
 .opts{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin:1rem 0}
 .opts button,.go{border:0;border-radius:.7rem;background:var(--btn);padding:.95rem .5rem;font-size:1.25rem;font-weight:700;cursor:pointer}
 .opts button:hover:not(:disabled){background:var(--btnh)}
@@ -52,13 +51,13 @@ background:linear-gradient(var(--line) 0 0) center/1px 100% no-repeat,linear-gra
 <p class="sub">Read the word. Pick or type how it sounds.</p>
 <div class="bar">
 <select id="set" aria-label="Word set"><option value="all">All words</option><option value="a">Set A (first list)</option><option value="b">Set B (second list)</option></select>
-<select id="mode" aria-label="Mode"><option value="choose">See hiragana, pick romaji</option><option value="rev">See romaji, pick hiragana</option><option value="type">Type the romaji</option></select>
+<select id="mode" aria-label="Mode"><option value="choose">See hiragana, pick romaji</option><option value="mean">See hiragana, pick the English meaning</option><option value="rev">See romaji, pick hiragana</option><option value="type">Type the romaji</option></select>
 <select id="len" aria-label="Rounds"><option>10</option><option>20</option><option>47</option></select>
 </div>
 <div id="app"></div>
 </main>
 <script>
-const A="とかい|city, metropolitan;おなか|stomach;ほし|star;なか|inside, middle;あつこ|girl's name;くつ|shoes;なおこ|girl's name;おはし|chopsticks;はい|yes;いぬ|dog;ねこ|cat;したしい|close, intimate;てんき|weather;たいせつ|important;せいと|students;とにかく|anyway;にく|meat;ひとつ|one (thing);ほんとう|really;そふ|grandpa;しんせつ|kind;なつ|summer";
+const A="とかい|city, metropolitan;おなか|stomach;ほし|star;なか|inside, middle;あつこ|girl's name (Atsuko);くつ|shoes;なおこ|girl's name (Naoko);おはし|chopsticks;はい|yes;いぬ|dog;ねこ|cat;したしい|close, intimate;てんき|weather;たいせつ|important;せいと|students;とにかく|anyway;にく|meat;ひとつ|one (thing);ほんとう|really;そふ|grandpa;しんせつ|kind;なつ|summer";
 const B="でんしゃ|train;だいどころ|kitchen;しゃかい|society;ごはん|cooked rice;べんり|convenient;きっぷ|ticket;やさい|vegetables;りんご|apple;かんぱい|cheers;めがね|glasses;たばこ|cigarettes;ときどき|sometimes;えらい|admirable;どうぶつ|animals;むすめ|daughter;にっき|diary;りょかん|Japanese inn;びょういん|hospital;いしゃ|doctor;じんじゃ|shrine;おてら|temple;おんがく|music;にほんご|Japanese;でんわ|phone;やくざ|gangster";
 const parse=(s,set)=>s.split(";").map(x=>{const[k,m]=x.split("|");return{k,m,set}});
 const WORDS=[...parse(A,"a"),...parse(B,"b")];
@@ -76,16 +75,15 @@ const $=id=>document.getElementById(id),app=$("app");
 let Q,i,score,streak,best,missed,done;
 function start(list){const n=Math.min(+$("len").value,list.length);Q=shuf(list).slice(0,n);i=0;score=0;streak=0;best=0;missed=[];show()}
 function pool(){const s=$("set").value;return WORDS.filter(w=>s==="all"||w.set===s)}
-function say(t){try{const u=new SpeechSynthesisUtterance(t);u.lang="ja-JP";u.rate=.8;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
 function show(){if(i>=Q.length)return end();const w=Q[i],ans=romaji(w.k),mode=$("mode").value;done=false;
 let h=`<div class="stat"><span>Word ${i+1} of ${Q.length}</span><span>Score ${score} · Streak ${streak}</span></div>
-<div class="paper">${mode==="rev"?`<div class="rom">${ans}</div>`:`<div class="cells" aria-label="${w.k}">${[...w.k].map(c=>`<div class="cell"><span>${c}</span></div>`).join("")}</div>`}<div><button class="say" id="say">Hear it</button></div></div>`;
+<div class="paper">${mode==="rev"?`<div class="rom">${ans}</div>`:`<div class="cells" aria-label="${w.k}">${[...w.k].map(c=>`<div class="cell"><span>${c}</span></div>`).join("")}</div>`}</div>`;
 if(mode==="rev"){const o=shuf([w.k,...kanaD(w.k)]);h+=`<div class="opts kana">${o.map(x=>`<button data-r="${x}">${x}</button>`).join("")}</div>`}
+else if(mode==="mean"){const same=shuf(WORDS.filter(x=>x.set===w.set&&x.m!==w.m)).map(x=>x.m);const o=shuf([w.m,...[...new Set(same)].slice(0,3)]);h+=`<div class="opts">${o.map(x=>`<button data-r="${x}">${x}</button>`).join("")}</div>`}
 else if(mode==="choose"){const o=shuf([ans,...distractors(w.k,ans)]);h+=`<div class="opts">${o.map(x=>`<button data-r="${x}">${x}</button>`).join("")}</div>`}
 else h+=`<div class="ans"><input id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type the reading in romaji" aria-label="Your answer"><button class="go" id="chk">Check</button></div>`;
 h+=`<div id="fb" class="fb" aria-live="polite"></div>`;app.innerHTML=h;
-$("say").onclick=()=>say(w.k);
-if(mode!=="type"){const right=mode==="rev"?w.k:ans;app.querySelectorAll(".opts button").forEach(b=>b.onclick=()=>judge(b.dataset.r===right,w,right,b))}
+if(mode!=="type"){const right=mode==="rev"?w.k:mode==="mean"?w.m:ans;app.querySelectorAll(".opts button").forEach(b=>b.onclick=()=>judge(b.dataset.r===right,w,right,b))}
 else{const inp=$("in");inp.focus();const go=()=>{if(inp.value.trim())judge(norm(inp.value)===norm(ans),w,ans)};$("chk").onclick=go;inp.onkeydown=e=>{if(e.key==="Enter")go()}}}
 function judge(ok,w,ans,btn){if(done)return;done=true;
 if(ok){score++;streak++;best=Math.max(best,streak)}else{streak=0;missed.push(w)}
